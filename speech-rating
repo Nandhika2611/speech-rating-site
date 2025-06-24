@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Speech Translation Evaluation</title>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const supabaseUrl = 'https://ozyeobwejgcukudwhnbp.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96eWVvYndlamdjdWt1ZHdobmJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3NDg1MDIsImV4cCI6MjA2NjMyNDUwMn0.ZfNw-x-5HY4vkp9CzJz76nr_PYuKCkJ8lM7_HvgYwbQ';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    window.supabase = supabase;
+  </script>
+  <style>
+    body {
+      font-family: 'Georgia', serif;
+      background-color: #f4f4f9;
+      color: #333;
+      max-width: 900px;
+      margin: auto;
+      padding: 30px;
+    }
+    h1, h2, h3 {
+      text-align: center;
+    }
+    .audio-block {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+    }
+    input, select, button {
+      margin-top: 10px;
+      display: block;
+    }
+    input[type=range] {
+      width: 100%;
+    }
+    button {
+      padding: 6px 12px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 5px;
+      background-color: #4a4a90;
+      color: white;
+      cursor: pointer;
+    }
+    .upload-section, .rating {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Speech Translation Evaluation Portal</h1>
+
+  <div class="upload-section">
+    <h3>Upload Audio</h3>
+    <select id="uploadCategory">
+      <option value="Telugu">Translation to Telugu</option>
+      <option value="Kannada1">Translation to Kannada</option>
+      <option value="Kannada2">Translation to Kannada</option>
+    </select>
+    <input type="file" id="audioFile">
+    <button onclick="uploadAudio()">Upload Audio</button>
+  </div>
+
+  <label>Enter your name:</label>
+  <input type="text" id="userName" placeholder="Your name">
+
+  <div id="audioList"></div>
+
+  <script type="module">
+    async function uploadAudio() {
+      const file = document.getElementById('audioFile').files[0];
+      const category = document.getElementById('uploadCategory').value;
+      const filePath = `${category}/${file.name}`;
+
+      let { error: uploadError } = await supabase.storage.from('audios').upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+      if (uploadError) {
+        alert('Upload failed');
+        console.log(uploadError);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage.from('audios').getPublicUrl(filePath);
+      const url = publicUrlData.publicUrl;
+
+      await supabase.from('audios').insert([{
+        name: file.name,
+        category: category,
+        url: url,
+        uploadedAt: new Date().toISOString()
+      }]);
+
+      alert('Upload successful');
+      listAudios();
+    }
+
+    async function submitRating(audioId, speed, value) {
+      const user = document.getElementById('userName').value.trim();
+      if (!user) return alert('Please enter your name before rating.');
+      await supabase.from('ratings').upsert({
+        audio_id: audioId,
+        user: user,
+        speed: speed,
+        rating: value
+      }, { onConflict: ['audio_id', 'user', 'speed'] });
+      alert('Rating saved for speed ' + speed);
+    }
+
+    async function listAudios() {
+      const audioList = document.getElementById('audioList');
+      audioList.innerHTML = '';
+
+      const { data: audios } = await supabase.from('audios').select('*').order('uploadedAt', { ascending: false });
+
+      for (const audio of audios) {
+        const { data: ratings } = await supabase.from('ratings').select('speed, avg:rating').eq('audio_id', audio.id).group('speed');
+
+        const block = document.createElement('div');
+        block.className = 'audio-block';
+
+        let ratingHtml = '';
+        [0.5, 1, 1.5, 2].forEach(speed => {
+          const avgRating = ratings?.find(r => r.speed == speed)?.avg?.toFixed(1) || '-';
+          ratingHtml += `
+            <label>Hello, please rate the audio at ${speed}x (Avg: ${avgRating})</label>
+            <input type="range" min="1" max="5" step="0.1" oninput="submitRating('${audio.id}', ${speed}, this.value)">
+          `;
+        });
+
+        block.innerHTML = `
+          <h3>${audio.name}</h3>
+          <audio id="audio-${audio.id}" controls>
+            <source src="${audio.url}" type="audio/mp3">
+          </audio>
+          <label>Speed:</label>
+          <input type="range" min="0" max="2" step="0.1" value="1" onchange="document.getElementById('audio-${audio.id}').playbackRate = this.value">
+          <div class="rating">
+            ${ratingHtml}
+          </div>
+        `;
+        audioList.appendChild(block);
+      }
+    }
+
+    listAudios();
+  </script>
+</body>
+</html>
