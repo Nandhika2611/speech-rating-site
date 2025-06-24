@@ -4,75 +4,100 @@
 <head>
   <meta charset="UTF-8">
   <title>Speech Translation Evaluation</title>
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-
-    const supabaseUrl = 'https://ozyeobwejgcukudwhnbp.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz...';
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    window.supabase = supabase;
-  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <style>
     body {
       font-family: 'Georgia', serif;
-      background-color: #f4f4f9;
-      color: #333;
-      max-width: 900px;
+      background: #f5f7fa;
+      color: #2e2e2e;
+      padding: 40px 20px;
+      max-width: 1000px;
       margin: auto;
-      padding: 30px;
     }
-    h1, h2, h3 {
+    h1 {
       text-align: center;
+      font-size: 2em;
+      color: #34315c;
     }
-    .audio-block {
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 15px;
-      margin-bottom: 20px;
-      border-radius: 10px;
+    .section {
+      background: #ffffff;
+      padding: 25px;
+      margin-top: 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.06);
     }
-    input, select, button {
+    select, input, button {
       margin-top: 10px;
-      display: block;
-    }
-    input[type=range] {
+      font-size: 1em;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
       width: 100%;
     }
     button {
-      padding: 6px 12px;
-      margin-top: 10px;
-      border: none;
-      border-radius: 5px;
-      background-color: #4a4a90;
+      background-color: #594ae2;
       color: white;
+      font-weight: bold;
       cursor: pointer;
     }
-    .upload-section, .rating {
-      margin-top: 20px;
+    audio {
+      width: 100%;
+      margin-top: 10px;
+    }
+    .rating-group {
+      margin-top: 15px;
+    }
+    .rating-group label {
+      display: block;
+      margin-top: 10px;
+    }
+    .host-area, .user-area {
+      margin-top: 25px;
+    }
+    .flex-columns {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .flex-columns > div {
+      flex: 1;
+      min-width: 280px;
     }
   </style>
 </head>
 <body>
-  <h1>Speech Translation Evaluation Portal</h1>
 
-  <div class="upload-section">
-    <h3>Upload Audio</h3>
-    <select id="uploadCategory">
-      <option value="Telugu">Translation to Telugu</option>
-      <option value="Kannada1">Translation to Kannada</option>
-      <option value="Kannada2">Translation to Kannada</option>
-    </select>
-    <input type="file" id="audioFile">
-    <button onclick="uploadAudio()">Upload Audio</button>
+  <h1>🎓 Speech Translation Evaluation Portal</h1>
+
+  <div class="section">
+    <h2>👤 Upload as Host</h2>
+    <div class="host-area">
+      <label>Choose Category:</label>
+      <select id="uploadCategory">
+        <option value="Telugu">Translation to Telugu</option>
+        <option value="Kannada1">Translation to Kannada</option>
+        <option value="Kannada2">Translation to Kannada</option>
+      </select>
+      <label>Choose Audio File (MP3):</label>
+      <input type="file" id="audioFile">
+      <button onclick="uploadAudio()">Upload Audio</button>
+    </div>
   </div>
 
-  <label>Enter your name:</label>
-  <input type="text" id="userName" placeholder="Your name">
+  <div class="section">
+    <h2>🙋 Rate Audios</h2>
+    <label>Enter Your Name:</label>
+    <input type="text" id="userName" placeholder="Your full name">
+    <div id="audioList"></div>
+  </div>
 
-  <div id="audioList"></div>
+  <script>
+    const supabase = supabase.createClient(
+      'https://ozyeobwejgcukudwhnbp.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96eWVvYndlamdjdWt1ZHdobmJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3NDg1MDIsImV4cCI6MjA2NjMyNDUwMn0.ZfNw-x-5HY4vkp9CzJz76nr_PYuKCkJ8lM7_HvgYwbQ'
+    );
 
-  <script type="module">
     async function uploadAudio() {
       const file = document.getElementById('audioFile').files[0];
       const category = document.getElementById('uploadCategory').value;
@@ -112,7 +137,6 @@
         speed: speed,
         rating: value
       }, { onConflict: ['audio_id', 'user', 'speed'] });
-      alert('Rating saved for speed ' + speed);
     }
 
     async function listAudios() {
@@ -125,13 +149,13 @@
         const { data: ratings } = await supabase.from('ratings').select('speed, avg:rating').eq('audio_id', audio.id).group('speed');
 
         const block = document.createElement('div');
-        block.className = 'audio-block';
+        block.className = 'section';
 
         let ratingHtml = '';
         [0.5, 1, 1.5, 2].forEach(speed => {
           const avgRating = ratings?.find(r => r.speed == speed)?.avg?.toFixed(1) || '-';
           ratingHtml += `
-            <label>Hello, please rate the audio at ${speed}x (Avg: ${avgRating})</label>
+            <label>Hello, please rate at ${speed}x (Avg: ${avgRating})</label>
             <input type="range" min="1" max="5" step="0.1" oninput="submitRating('${audio.id}', ${speed}, this.value)">
           `;
         });
@@ -141,11 +165,9 @@
           <audio id="audio-${audio.id}" controls>
             <source src="${audio.url}" type="audio/mp3">
           </audio>
-          <label>Speed:</label>
+          <label>Speed Control:</label>
           <input type="range" min="0" max="2" step="0.1" value="1" onchange="document.getElementById('audio-${audio.id}').playbackRate = this.value">
-          <div class="rating">
-            ${ratingHtml}
-          </div>
+          <div class="rating-group">${ratingHtml}</div>
         `;
         audioList.appendChild(block);
       }
@@ -153,5 +175,6 @@
 
     listAudios();
   </script>
+
 </body>
 </html>
